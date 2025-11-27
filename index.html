@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ar">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quran OCR Viewer</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px;
+        color: #fff;
+      }
+
+      #controls {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        padding: 15px 25px;
+        border-radius: 15px;
+        margin-bottom: 20px;
+        display: flex;
+        gap: 15px;
+        align-items: center;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      }
+
+      button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+      }
+
+      button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+      }
+
+      button:active {
+        transform: translateY(0);
+      }
+
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .mode-toggle {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      }
+
+      #pagenum {
+        font-weight: bold;
+        font-size: 16px;
+        color: #ffd700;
+      }
+
+      #container {
+        position: relative;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        overflow: hidden;
+      }
+
+      #page {
+        display: block;
+        max-width: 800px;
+        width: 100%;
+        height: auto;
+      }
+
+      .selection-box {
+        position: absolute;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .aya-box {
+        background: rgba(255, 215, 0, 0.15);
+        border: 3px solid rgba(255, 215, 0, 0.7);
+        clip-path: polygon(
+          8px 0%,
+          calc(100% - 8px) 0%,
+          100% 8px,
+          100% calc(100% - 8px),
+          calc(100% - 8px) 100%,
+          8px 100%,
+          0% calc(100% - 8px),
+          0% 8px
+        );
+      }
+
+      .aya-box:hover {
+        background: rgba(255, 215, 0, 0.3);
+        border-color: rgba(255, 215, 0, 1);
+        transform: scale(1.02);
+      }
+
+      .word-box {
+        background: rgba(0, 255, 127, 0.15);
+        border: 2px solid rgba(0, 255, 127, 0.7);
+        clip-path: polygon(
+          6px 0%,
+          calc(100% - 6px) 0%,
+          100% 6px,
+          100% calc(100% - 6px),
+          calc(100% - 6px) 100%,
+          6px 100%,
+          0% calc(100% - 6px),
+          0% 6px
+        );
+      }
+
+      .word-box:hover {
+        background: rgba(0, 255, 127, 0.3);
+        border-color: rgba(0, 255, 127, 1);
+        transform: scale(1.05);
+      }
+
+      .separator-box {
+        background: rgba(255, 140, 0, 0.15);
+        border: 2px solid rgba(255, 140, 0, 0.6);
+        clip-path: polygon(
+          6px 0%,
+          calc(100% - 6px) 0%,
+          100% 6px,
+          100% calc(100% - 6px),
+          calc(100% - 6px) 100%,
+          6px 100%,
+          0% calc(100% - 6px),
+          0% 6px
+        );
+        pointer-events: none;
+        opacity: 0.7;
+      }
+
+      .selected {
+        background: rgba(255, 0, 127, 0.3) !important;
+        border-color: rgba(255, 0, 127, 1) !important;
+        box-shadow: 0 0 20px rgba(255, 0, 127, 0.8);
+      }
+
+      #info {
+        margin-top: 15px;
+        padding: 15px 25px;
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border-radius: 10px;
+        min-height: 60px;
+        max-width: 800px;
+        width: 100%;
+        text-align: center;
+        direction: rtl;
+      }
+
+      .mode-indicator {
+        display: inline-block;
+        padding: 5px 15px;
+        background: rgba(255, 215, 0, 0.3);
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: bold;
+        margin-bottom: 8px;
+      }
+
+      .loading {
+        color: #ffd700;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="controls">
+      <button id="prevBtn" onclick="prevPage()">← السابق</button>
+      <button id="nextBtn" onclick="nextPage()">التالي →</button>
+      <span>صفحة: <span id="pagenum">1</span></span>
+      <button class="mode-toggle" onclick="toggleMode()">
+        <span id="modeText">وضع الكلمات</span>
+      </button>
+    </div>
+
+    <div id="container">
+      <img id="page" src="" alt="Quran Page" style="display: none" />
+    </div>
+
+    <div id="info">
+      <div class="mode-indicator">
+        <span id="modeIndicator">وضع الآيات</span>
+      </div>
+      <div id="selectedText" class="loading">جاري التحميل...</div>
+    </div>
+
+    <script>
+      let currentPage = 0;
+      const totalPages = 10;
+      let mode = "aya";
+      let currentData = null;
+
+      function getBoundingBox(words) {
+        const allX = words.flatMap((w) => w.bbox_points.map((p) => p[0]));
+        const allY = words.flatMap((w) => w.bbox_points.map((p) => p[1]));
+        return {
+          x: Math.min(...allX),
+          y: Math.min(...allY),
+          width: Math.max(...allX) - Math.min(...allX),
+          height: Math.max(...allY) - Math.min(...allY),
+        };
+      }
+
+      function createBox(bbox, scale, className, onClick) {
+        const box = document.createElement("div");
+        box.className = `selection-box ${className}`;
+        box.style.left = bbox.x * scale + "px";
+        box.style.top = bbox.y * scale + "px";
+        box.style.width = bbox.width * scale + "px";
+        box.style.height = bbox.height * scale + "px";
+        box.onclick = (e) => {
+          document
+            .querySelectorAll(".selection-box")
+            .forEach((b) => b.classList.remove("selected"));
+          box.classList.add("selected");
+          onClick();
+          e.stopPropagation();
+        };
+        document.getElementById("container").appendChild(box);
+      }
+
+      function renderBoxes() {
+        const img = document.getElementById("page");
+        const container = document.getElementById("container");
+
+        container.querySelectorAll(".selection-box").forEach((b) => b.remove());
+
+        if (!currentData || !img.complete) return;
+
+        // Use normalized height from metadata if available
+        let scale;
+        if (currentData.metadata && currentData.metadata.normalized_height) {
+          scale = img.height / currentData.metadata.normalized_height;
+        } else {
+          scale = img.width / img.naturalWidth;
+        }
+
+        // Always show separators (aya numbers) - non-clickable, just for reference
+        if (currentData.separators) {
+          currentData.separators.forEach((sep) => {
+            const bbox = getBoundingBox([sep]);
+            const box = document.createElement("div");
+            box.className = "separator-box";
+            box.style.left = bbox.x * scale + "px";
+            box.style.top = bbox.y * scale + "px";
+            box.style.width = bbox.width * scale + "px";
+            box.style.height = bbox.height * scale + "px";
+            container.appendChild(box);
+          });
+        }
+
+        if (mode === "aya" && currentData.ayas) {
+          // Aya mode - full aya boxes (without separators)
+          currentData.ayas.forEach((aya, idx) => {
+            const bbox = getBoundingBox(aya.words);
+            createBox(bbox, scale, "aya-box", () => {
+              document.getElementById("selectedText").innerText = aya.text;
+            });
+          });
+        } else {
+          // Word mode - individual word boxes
+          currentData.words.forEach((w) => {
+            const bbox = getBoundingBox([w]);
+            createBox(bbox, scale, "word-box", () => {
+              document.getElementById("selectedText").innerText = w.text;
+            });
+          });
+        }
+      }
+
+      function loadPage(idx) {
+        const img = document.getElementById("page");
+        const container = document.getElementById("container");
+
+        document.getElementById("selectedText").innerText = "جاري التحميل...";
+        document.getElementById("selectedText").className = "loading";
+        container.querySelectorAll(".selection-box").forEach((b) => b.remove());
+
+        const pageNum = String(idx + 1).padStart(2, "0");
+        const jsonPath = `json/page${pageNum}.json`;
+        const imgPath = `pages/page${pageNum}.png`;
+
+        fetch(jsonPath)
+          .then((r) => {
+            if (!r.ok) throw new Error(`HTTP error! status: ${r.status}`);
+            return r.json();
+          })
+          .then((data) => {
+            currentData = data;
+
+            img.onload = () => {
+              img.style.display = "block";
+              renderBoxes();
+              document.getElementById("selectedText").innerText =
+                "اضغط على الآية أو الكلمة لعرض النص";
+              document.getElementById("selectedText").className = "";
+            };
+
+            img.onerror = () => {
+              document.getElementById("selectedText").innerText =
+                "خطأ في تحميل الصورة";
+            };
+
+            img.src = imgPath;
+          })
+          .catch((err) => {
+            console.error("Error loading page:", err);
+            document.getElementById("selectedText").innerText =
+              "خطأ في تحميل البيانات: " + err.message;
+            document.getElementById("selectedText").className = "";
+          });
+
+        document.getElementById("pagenum").innerText = idx + 1;
+        updateButtons();
+      }
+
+      function updateButtons() {
+        document.getElementById("prevBtn").disabled = currentPage === 0;
+        document.getElementById("nextBtn").disabled =
+          currentPage >= totalPages - 1;
+      }
+
+      function toggleMode() {
+        mode = mode === "aya" ? "word" : "aya";
+        document.getElementById("modeText").innerText =
+          mode === "aya" ? "وضع الكلمات" : "وضع الآيات";
+        document.getElementById("modeIndicator").innerText =
+          mode === "aya" ? "وضع الآيات" : "وضع الكلمات";
+        renderBoxes();
+      }
+
+      function prevPage() {
+        if (currentPage > 0) {
+          currentPage--;
+          loadPage(currentPage);
+        }
+      }
+
+      function nextPage() {
+        if (currentPage < totalPages - 1) {
+          currentPage++;
+          loadPage(currentPage);
+        }
+      }
+
+      loadPage(currentPage);
+    </script>
+  </body>
+</html>
